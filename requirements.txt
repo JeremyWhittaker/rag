@@ -1,0 +1,20 @@
+# core libs
+openai>=1.27.0
+python-dotenv>=1.0.1
+tqdm>=4.66.4
+
+# LangChain split packages (May-2025)
+langchain-core>=0.1.45
+langchain-community>=0.2.18
+langchain-openai>=0.1.5
+
+# Vector DB
+chromadb>=0.5.0
+
+# PDF parsing + OCR
+unstructured[all-docs]>=0.13.4
+iso-639>=0.5.0     # faster import, cached TSV
+
+# API server
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
