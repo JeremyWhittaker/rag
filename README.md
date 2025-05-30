@@ -1,121 +1,114 @@
-# RAG — Chat with Your PDFs  
-*Minimal Retrieval-Augmented Generation stack that runs locally.*
+RAG — Chat with Your PDFs
+Minimal Retrieval-Augmented Generation stack that runs locally and lets you keep completely separate projects (court cases, statutes library, personal brief style, etc.).
 
----
+✨ What this repo does
+Parses every PDF (text first, OCR fallback) with unstructured — strategy="fast" extracts embedded text and auto-OCRs pages that lack it. 
+Unstructured
 
-## ✨ What this repo does
+Chunks & embeds the text (~800 tokens) via OpenAI text-embedding-3-large ( $0.13 / M tokens ). 
+OpenAI Platform
 
-1. **Parses** every PDF (text first, OCR fallback) with *unstructured*.  
-2. **Chunks & embeds** the text (≈ 800 tokens) via OpenAI `text-embedding-3-large`.  
-3. **Stores vectors** in a local **Chroma** index for fast semantic search.  
-4. **Answers questions** with GPT-4o (or any LLM supported by LangChain).  
-5. Ships a **FastAPI** server so you can chat in the browser at `/docs`.
+Stores vectors in a per-project Chroma collection on disk for millisecond retrieval. 
+LangChain Python API
 
----
+Answers questions with GPT-4o (or any LangChain-compatible LLM).
 
-## 🗂 Directory layout
+Ships a FastAPI server so you can chat in the browser at /docs.
 
-```
-rag/                    ← your project folder
-├── README.md
+🗂 Directory layout
+sql
+Copy
+Edit
+rag/                   ← repo root
+├── src/
+│   ├── ingest.py      ← build/update one project
+│   ├── query.py       ← query one OR many projects
+│   └── server.py
+├── index/             ← parent folder for all projects
+│   ├── smith_case/    ← vectors for project “smith_case”
+│   └── statutes/      ← vectors for project “statutes”
 ├── requirements.txt
 ├── .env.example
-├── src/
-│   ├── ingest.py
-│   ├── query.py
-│   ├── server.py
-│   └── …
-└── index/              ← auto-created vector store
-```
-
----
-
-## ⚙️ Install
-
-```bash
-# clone or move into the folder you've named 'rag'
+└── README.md
+⚙️ Install
+bash
+Copy
+Edit
 cd ~/projects/rag
-
-# create & activate env
 conda create -n rag python=3.11 -y
 conda activate rag
-
-# install dependencies
-pip install --upgrade pip
 pip install -r requirements.txt
-```
+cp .env.example .env   # add OPENAI_API_KEY
+1️⃣ Ingest (project-scoped)
+bash
+Copy
+Edit
+# first time
+python -m src.ingest --pdf-dir ~/cases/Smith_v_Jones --project smith_case
 
----
+# incremental: add one PDF, run same command → SHA-256 dedup skips re-embedding
+ingest.py creates (or re-opens) index/<project>/ and stores a SHA-256 hash in metadata; duplicates are skipped using a where filter. 
+Reddit
 
-## 🔑 Configuration
+Text splitter now expects langchain.schema.Document objects, preventing the AttributeError you saw. 
+LangChain
 
-```bash
-cp .env.example .env
-$EDITOR .env          # add your OPENAI_API_KEY
-```
+2️⃣ Query
+bash
+Copy
+Edit
+# ask one project
+python -m src.query "What did the judge decide on Rule 56?" \
+                    --projects smith_case
 
----
+# ask multiple projects at once
+python -m src.query "Does anything override Smith v. Jones?" \
+                    --projects statutes smith_case
+query.py builds a MergerRetriever that merges results from each project’s retriever. 
+LangChain
+LangChain Python API
 
-## 📥 Build (or rebuild) the index
+⚖️ Authority weighting (statutes > filings)
+Hierarchical – query statutes first; if docs are returned, skip others.
 
-```bash
-python -m src.ingest --pdf-dir /absolute/path/to/my_pdfs
-```
+Metadata weight – store priority=2 vs 1 and switch to EnsembleRetriever for weighted voting. 
+Stack Overflow
 
-*Uses `strategy="fast"` so pages with no embedded text are automatically OCR’d.*
+Prompt rule – system message: “If statutes conflict with filings, statutes prevail.” 
+GitHub
 
----
+Combine 2 + 3 for highest reliability.
 
-## 💬 Ask questions (CLI)
-
-```bash
-python -m src.query "Give me the key findings from the 2024 audit report."
-```
-
----
-
-## 🌐 Run the chat API
-
-```bash
+🌐 Run the chat service
+bash
+Copy
+Edit
 uvicorn src.server:app --host 0.0.0.0 --port 8000
 # open http://localhost:8000/docs
-```
-
----
-
-## 🔄 Nightly re-index (optional)
-
-```bash
-# edit crontab
-crontab -e
-# add:
+🔄 Nightly cron (example)
+cron
+Copy
+Edit
 0 2 * * * source ~/miniconda3/etc/profile.d/conda.sh && \
-          conda run -n rag python -m src.ingest --pdf-dir /path/to/pdfs
-```
+          conda run -n rag python -m src.ingest \
+          --pdf-dir /data/statutes --project statutes \
+          --root-index ~/projects/rag/index
+🛠 GitHub quick-push
+bash
+Copy
+Edit
+git add README.md src/ingest.py src/query.py
+git commit -m "feat: project flag, multi-project querying, README update"
+git push   # first push?  git push -u origin main
+(Each repo’s .git/ folder is isolated, so this won’t affect your other project.) 
+Python documentation
 
----
-
-## 🛠 GitHub quick-push (one time)
-
-```bash
-cd ~/projects/rag
-git init
-git add .
-git commit -m "Initial commit"
-git remote add origin git@github.com:<USER>/rag.git
-git push -u origin main
-```
-
----
-
-## Troubleshooting
-
-| Issue | Fix |
-|-------|-----|
-| `ModuleNotFoundError: langchain_community` | `pip install -U langchain-community langchain-core` |
-| pdfminer warning spam | Already silenced in `src/ingest.py`; raise level to CRITICAL if needed |
-| Slow import on first run | Ensure `iso-639>=0.5.0` is installed |
-
----
+Troubleshooting
+Issue	Fix
+ModuleNotFoundError: langchain_community	pip install -U langchain-community langchain-core 
+Stack Overflow
+pdfminer colour-space spam	Already silenced in src/ingest.py; raise to CRITICAL if needed.
+Slow first import	Ensure iso-639>=0.5.0 (cached TSV). 
+Python documentation
 
 MIT License — Happy indexing!

@@ -1,20 +1,27 @@
-"""PDF → vector index builder for the RAG stack."""
+"""PDF → vector-store indexer
+   ------------------------------------------
+   • Recursively crawls --pdf-dir
+   • Extracts text via unstructured (strategy='fast')
+       → auto-OCRs only pages with no text
+   • Skips pdfminer colour-space spam + telemetry
+   • Builds / updates a **project-scoped** Chroma collection
+"""
 
-from __future__ import annotations   # ← keep this the first live line!
+from __future__ import annotations          # must stay first!
 
-# ── stdlib tweaks -----------------------------------------------------------
-import os
-import logging
-logging.getLogger("pdfminer").setLevel(logging.ERROR)   # silence colour-space spam
-os.environ["SCARF_NO_ANALYTICS"] = "true"               # opt-out of Unstructured telemetry
-
-# ── 3rd-party ---------------------------------------------------------------
-import argparse
+# ── stdlib ------------------------------------------------------------------
+import argparse, hashlib, logging, os
 from pathlib import Path
 from typing import Sequence
 
+# silence noisy libs & telemetry
+logging.getLogger("pdfminer").setLevel(logging.ERROR)
+os.environ["SCARF_NO_ANALYTICS"] = "true"
+
+# ── third-party -------------------------------------------------------------
 from tqdm import tqdm
 from unstructured.partition.pdf import partition_pdf
+from langchain.schema import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
@@ -25,15 +32,15 @@ from .logger import get_logger
 
 LOGGER = get_logger(__name__)
 
-# ---------------------------------------------------------------------------
+# ── helpers -----------------------------------------------------------------
+def sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    h.update(path.read_bytes())
+    return h.hexdigest()
 
 
-def load_pdf(path: Path, strategy: str = "fast") -> Sequence[str]:
-    """
-    Extract text from a PDF.  The 'fast' strategy uses pdfminer but
-    *automatically* falls back to OCR for pages with no extractable text
-    (Unstructured docs).  No manual detection needed.
-    """
+def load_pdf(path: Path, *, strategy: str = "fast") -> Sequence[str]:
+    """Return text for a single PDF.  'fast' auto-OCRs scanned pages."""
     return [
         el.text
         for el in partition_pdf(filename=str(path), strategy=strategy)
@@ -41,36 +48,60 @@ def load_pdf(path: Path, strategy: str = "fast") -> Sequence[str]:
     ]
 
 
-def ingest(pdf_dir: Path, *, index_dir: Path = INDEX_DIR, chunk_size: int = 800) -> None:
-    """Walk `pdf_dir`, embed/chunk, and persist to a Chroma collection."""
+# ── main ingest -------------------------------------------------------------
+def ingest(*, pdf_dir: Path, project: str, root_index: Path = INDEX_DIR, chunk_size: int = 800) -> None:
+    proj_dir = root_index / project          # e.g. ./index/smith_case/
+    proj_dir.mkdir(parents=True, exist_ok=True)
+
+    db = Chroma(
+        persist_directory=str(proj_dir),
+        collection_name=project,
+        embedding_function=OpenAIEmbeddings(model=EMBED_MODEL),
+    )
+
+    existing = {
+        m.get("sha256") for m in db.get()["metadatas"] if "sha256" in m
+    }
+
+    splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=120)
+    new_docs: list[Document] = []
+
     pdfs = list(pdf_dir.rglob("*.pdf"))
     if not pdfs:
         LOGGER.error("No PDFs found in %s", pdf_dir)
         return
 
-    splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=120)
-    docs = []
-
     for pdf in tqdm(pdfs, desc="Parsing PDFs"):
+        digest = sha256(pdf)
+        if digest in existing:
+            continue        # already embedded
+
         for text in load_pdf(pdf):
-            docs.append({"page_content": text, "metadata": {"source": pdf.name}})
+            new_docs.append(
+                Document(
+                    page_content=text,
+                    metadata={"source": pdf.name, "sha256": digest},
+                )
+            )
 
-    LOGGER.info("Splitting into %d total chunks …", len(docs))
-    chunks = splitter.split_documents(docs)
+    if not new_docs:
+        LOGGER.info("No new PDFs to embed for project '%s'", project)
+        return
 
-    embeddings = OpenAIEmbeddings(model=EMBED_MODEL)
-    Chroma.from_documents(
-        chunks,
-        embedding_function=embeddings,
-        persist_directory=str(index_dir),
-        collection_name="pdf_kb",
-    )
-    LOGGER.info("✅ Index stored at %s", index_dir)
+    LOGGER.info("Splitting into chunks …")
+    chunks = splitter.split_documents(new_docs)
+    LOGGER.info("Embedding %d new chunks", len(chunks))
+
+    db.add_documents(chunks)
+    db.persist()
+    LOGGER.info("✅ Finished ingest for %s (stored at %s)", project, proj_dir)
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description="Ingest a directory of PDFs")
-    ap.add_argument("--pdf-dir", type=Path, required=True)
-    ap.add_argument("--index-dir", type=Path, default=INDEX_DIR)
+    ap = argparse.ArgumentParser(description="Ingest PDFs into a project collection")
+    ap.add_argument("--pdf-dir", type=Path, required=True, help="Directory of PDFs (recursive)")
+    ap.add_argument("--project", required=True, help="Project name (court_case, statutes, etc.)")
+    ap.add_argument("--root-index", type=Path, default=INDEX_DIR, help="Folder holding all projects")
     args = ap.parse_args()
-    ingest(args.pdf_dir, index_dir=args.index_dir)
+
+    ingest(pdf_dir=args.pdf_dir, project=args.project, root_index=args.root_index)
