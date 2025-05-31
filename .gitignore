@@ -1,5 +1,31 @@
+# Environment
 .env
+
+# Index files (too large for git)
 index/
+
+# Python
 __pycache__/
-*.pyc
-index/\n.env\n__pycache__/\n*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+ingest_log.txt
+
+# Dependencies installed locally
+=0.6.0
