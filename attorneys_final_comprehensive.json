@@ -1,0 +1,51 @@
+{
+  "summary": {
+    "files_processed": 250,
+    "total_attorneys": 4,
+    "petitioner_count": 0,
+    "respondent_count": 4
+  },
+  "petitioner_attorneys": [],
+  "respondent_attorneys": [
+    {
+      "name": "Ellen Davis",
+      "case_count": 1,
+      "firm": null,
+      "email": "n@azre.gov",
+      "esq_title": true,
+      "cases": [
+        "21F-H2121058-REL-RHG_954077"
+      ]
+    },
+    {
+      "name": "Emily H. Mann",
+      "case_count": 1,
+      "firm": null,
+      "email": "n@pmblaw.org",
+      "esq_title": true,
+      "cases": [
+        "22F-H2221017-REL_948254"
+      ]
+    },
+    {
+      "name": "Alexandra M. Kurtyka",
+      "case_count": 1,
+      "firm": null,
+      "email": "e@townsq.io",
+      "esq_title": true,
+      "cases": [
+        "24F-H045-REL_1193702"
+      ]
+    },
+    {
+      "name": "Christopher Hanlon",
+      "case_count": 1,
+      "firm": null,
+      "email": "d@yahoo.com",
+      "esq_title": true,
+      "cases": [
+        "22F-H2222035-REL_979812"
+      ]
+    }
+  ]
+}

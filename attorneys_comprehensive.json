@@ -1,0 +1,20 @@
+{
+  "extraction_summary": {
+    "total_files_processed": 250,
+    "total_unique_attorneys": 1,
+    "petitioner_attorneys_count": 1,
+    "respondent_attorneys_count": 0
+  },
+  "petitioner_attorneys": [
+    {
+      "name": "Mary T. Hone",
+      "title": "Assistant Attorney General",
+      "bar_number": null,
+      "case_count": 1,
+      "cases": [
+        "21F-H2120004-REL_839537"
+      ]
+    }
+  ],
+  "respondent_attorneys": []
+}
