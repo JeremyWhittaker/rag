@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legal RAG Assistant - ADRE Case Research</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .card-header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .card-body {
+            padding: 30px;
+        }
+
+        .query-form {
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .query-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            resize: vertical;
+            min-height: 120px;
+            font-family: inherit;
+        }
+
+        .query-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .option-group {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        .option-group h4 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            margin-right: 8px;
+            transform: scale(1.2);
+        }
+
+        .checkbox-group label {
+            margin-bottom: 0;
+            font-weight: normal;
+            cursor: pointer;
+        }
+
+        .submit-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .results-section {
+            margin-top: 30px;
+            display: none;
+        }
+
+        .result-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .result-meta {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .meta-item {
+            background: white;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            color: #2c3e50;
+            border: 1px solid #e0e0e0;
+        }
+
+        .result-answer {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            line-height: 1.6;
+            border: 1px solid #e0e0e0;
+        }
+
+        .citations {
+            margin-top: 20px;
+        }
+
+        .citation-item {
+            background: white;
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            border-left: 3px solid #28a745;
+            font-size: 14px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .example-queries {
+            margin-top: 20px;
+        }
+
+        .example-query {
+            background: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-radius: 6px;
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 14px;
+        }
+
+        .example-query:hover {
+            background: #bbdefb;
+        }
+
+        .error {
+            background: #ffebee;
+            border: 1px solid #ffcdd2;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .card-body {
+                padding: 20px;
+            }
+            
+            .options-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .result-meta {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏛️ Legal RAG Assistant</h1>
+            <p>Advanced search and analysis for ADRE homeowner association cases</p>
+        </div>
+
+        <div class="main-card">
+            <div class="card-header">
+                <h2>ADRE Case Research System</h2>
+                <p>Query 292 ADRE/OAH decisions with comprehensive legal analysis</p>
+            </div>
+
+            <div class="card-body">
+                <form id="queryForm" class="query-form">
+                    <div class="form-group">
+                        <label for="question">Your Legal Question:</label>
+                        <textarea 
+                            id="question" 
+                            name="question" 
+                            class="query-input"
+                            placeholder="Ask about judges, attorneys, HOAs, violations, statutes, penalties, or any other aspect of these ADRE cases...&#10;&#10;Example: 'List all attorneys who represented homeowners associations and their law firms'"
+                            required
+                        ></textarea>
+                    </div>
+
+                    <div class="options-grid">
+                        <div class="option-group">
+                            <h4>Search Options</h4>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="hierarchy" name="hierarchy" checked>
+                                <label for="hierarchy">Legal hierarchy analysis</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="citations" name="citations" checked>
+                                <label for="citations">Include citations</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="verbose" name="verbose">
+                                <label for="verbose">Detailed analysis</label>
+                            </div>
+                        </div>
+
+                        <div class="option-group">
+                            <h4>Project</h4>
+                            <select id="project" name="project" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc;">
+                                <option value="adre_decisions_complete">ADRE Decisions Complete</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="submit-btn" id="submitBtn">
+                        🔍 Search ADRE Cases
+                    </button>
+                </form>
+
+                <div class="example-queries">
+                    <h4 style="margin-bottom: 15px; color: #2c3e50;">💡 Example Queries:</h4>
+                    <div class="example-query" onclick="setQuery('List all Administrative Law Judges who decided these ADRE cases')">
+                        List all Administrative Law Judges who decided these ADRE cases
+                    </div>
+                    <div class="example-query" onclick="setQuery('What attorneys represented homeowners associations? Include their names and law firms.')">
+                        What attorneys represented homeowners associations? Include their names and law firms.
+                    </div>
+                    <div class="example-query" onclick="setQuery('Find cases involving CC&R violations. What were the specific violations and outcomes?')">
+                        Find cases involving CC&R violations. What were the specific violations and outcomes?
+                    </div>
+                    <div class="example-query" onclick="setQuery('What Arizona Revised Statutes (A.R.S.) are most commonly cited in these cases?')">
+                        What Arizona Revised Statutes (A.R.S.) are most commonly cited in these cases?
+                    </div>
+                    <div class="example-query" onclick="setQuery('Find cases where monetary fines were imposed. What were the amounts and reasons?')">
+                        Find cases where monetary fines were imposed. What were the amounts and reasons?
+                    </div>
+                    <div class="example-query" onclick="setQuery('Which homeowners associations appear as respondents most frequently?')">
+                        Which homeowners associations appear as respondents most frequently?
+                    </div>
+                </div>
+
+                <div id="results" class="results-section">
+                    <!-- Results will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('queryForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const resultsDiv = document.getElementById('results');
+        const questionInput = document.getElementById('question');
+
+        function setQuery(query) {
+            questionInput.value = query;
+            questionInput.focus();
+        }
+
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(form);
+            const question = formData.get('question');
+            
+            if (!question.trim()) {
+                alert('Please enter a question');
+                return;
+            }
+
+            // Show loading state
+            submitBtn.disabled = true;
+            submitBtn.textContent = '🔍 Searching...';
+            
+            resultsDiv.style.display = 'block';
+            resultsDiv.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Analyzing ADRE cases and legal precedents...</p>
+                </div>
+            `;
+
+            try {
+                const response = await fetch('/legal-query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        question: question,
+                        projects: [formData.get('project')],
+                        enable_hierarchy: formData.has('hierarchy'),
+                        include_citations: formData.has('citations'),
+                        verbose: formData.has('verbose')
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                displayResults(result);
+
+            } catch (error) {
+                console.error('Error:', error);
+                resultsDiv.innerHTML = `
+                    <div class="error">
+                        <strong>Error:</strong> ${error.message || 'Failed to fetch results. Please try again.'}
+                    </div>
+                `;
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '🔍 Search ADRE Cases';
+            }
+        });
+
+        function displayResults(result) {
+            const uniqueDocs = result.sources ? 
+                [...new Set(result.sources.map(s => s.filename))].length : 0;
+
+            let html = `
+                <div class="result-card">
+                    <div class="result-meta">
+                        <div class="meta-item">📊 Query Type: ${result.query_type || 'Unknown'}</div>
+                        <div class="meta-item">📚 Sources: ${result.sources ? result.sources.length : 0}</div>
+                        <div class="meta-item">📄 Documents: ${uniqueDocs}</div>
+                        ${result.processing_time ? `<div class="meta-item">⏱️ Time: ${result.processing_time}</div>` : ''}
+                    </div>
+                    
+                    <div class="result-answer">
+                        ${formatAnswer(result.answer || 'No answer provided')}
+                    </div>
+            `;
+
+            if (result.citations && Object.keys(result.citations).length > 0) {
+                html += `
+                    <div class="citations">
+                        <h4 style="margin-bottom: 10px; color: #2c3e50;">📖 Citations:</h4>
+                `;
+                
+                for (const [citation, source] of Object.entries(result.citations)) {
+                    html += `
+                        <div class="citation-item">
+                            <strong>${citation}</strong><br>
+                            <small style="color: #666;">${source}</small>
+                        </div>
+                    `;
+                }
+                
+                html += `</div>`;
+            }
+
+            html += `</div>`;
+
+            resultsDiv.innerHTML = html;
+        }
+
+        function formatAnswer(answer) {
+            // Basic formatting for better readability
+            return answer
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/\n/g, '<br>')
+                .replace(/^/, '<p>')
+                .replace(/$/, '</p>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>');
+        }
+
+        // Auto-resize textarea
+        questionInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.max(120, this.scrollHeight) + 'px';
+        });
+    </script>
+</body>
+</html>

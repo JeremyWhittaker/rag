@@ -1,7 +1,8 @@
 """Enhanced FastAPI server with legal-specific endpoints."""
 
 from fastapi import FastAPI, Query, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from pathlib import Path
@@ -25,6 +26,33 @@ app = FastAPI(
     description="AI-powered legal research assistant for ADRE/OAH cases",
     version="2.0.0"
 )
+
+# Mount static files
+static_dir = Path(__file__).parent.parent / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+# Root route to serve the main interface
+@app.get("/")
+async def read_root():
+    """Serve the main HTML interface."""
+    html_file = static_dir / "index.html"
+    if html_file.exists():
+        return FileResponse(str(html_file))
+    else:
+        return {
+            "name": "Legal RAG Assistant",
+            "version": "2.0.0",
+            "message": "Web interface not available. Use API endpoints directly.",
+            "endpoints": {
+                "/ask": "General legal query (enhanced)",
+                "/legal-query": "Advanced legal query with full analysis",
+                "/citation-lookup": "Look up specific citations",
+                "/metadata-search": "Search documents by metadata",
+                "/projects": "List available projects",
+                "/statistics": "Get index statistics"
+            }
+        }
 
 
 class LegalQueryRequest(BaseModel):
