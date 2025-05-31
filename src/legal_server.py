@@ -15,6 +15,7 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 
 from .config import INDEX_DIR, CHAT_MODEL, EMBED_MODEL
 from .query import build_legal_aware_retriever
+from .hybrid_retriever_simple import create_hybrid_retrieval_chain
 from .legal_query import LegalQueryEnhancer, create_legal_prompt_template
 from .legal_metadata import MetadataIndex
 from .citation_resolver import CitationResolver, CitationEnhancer
@@ -115,17 +116,12 @@ async def ask(
     """Simple legal query endpoint (backwards compatible)."""
     project_list = [p.strip() for p in projects.split(",")]
     
-    # Build retriever
-    retriever = build_legal_aware_retriever(project_list, INDEX_DIR)
-    
-    # Create chain
+    # Create hybrid chain for better case number handling
     llm = ChatOpenAI(model=CHAT_MODEL, temperature=0)
     enhancer = LegalQueryEnhancer()
     query_info = enhancer.enhance_query(q)
-    
     prompt = create_legal_prompt_template(query_info['query_type'])
-    combine_docs_chain = create_stuff_documents_chain(llm, prompt)
-    rag_chain = create_retrieval_chain(retriever, combine_docs_chain)
+    rag_chain = create_hybrid_retrieval_chain(project_list, INDEX_DIR, llm, prompt)
     
     # Invoke
     result = rag_chain.invoke({
@@ -146,20 +142,10 @@ async def legal_query(request: LegalQueryRequest):
         enhancer = LegalQueryEnhancer()
         query_info = enhancer.enhance_query(request.question)
         
-        # 2. Build retriever
-        if request.enable_hierarchy:
-            retriever = build_legal_aware_retriever(request.projects, INDEX_DIR)
-        else:
-            from .query import build_retriever
-            from langchain.retrievers.merger_retriever import MergerRetriever
-            retrievers = [build_retriever(p, INDEX_DIR) for p in request.projects]
-            retriever = MergerRetriever(retrievers=retrievers)
-        
-        # 3. Create chain with legal prompt
+        # 2. Create hybrid retrieval chain for better case number handling
         llm = ChatOpenAI(model=CHAT_MODEL, temperature=0)
         prompt = create_legal_prompt_template(query_info['query_type'])
-        combine_docs_chain = create_stuff_documents_chain(llm, prompt)
-        rag_chain = create_retrieval_chain(retriever, combine_docs_chain)
+        rag_chain = create_hybrid_retrieval_chain(request.projects, INDEX_DIR, llm, prompt)
         
         # 4. Invoke chain
         result = rag_chain.invoke({
